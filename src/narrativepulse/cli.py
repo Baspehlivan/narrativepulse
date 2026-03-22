@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from narrativepulse.metrics import DocumentMetrics, analyze_document
 from narrativepulse.parser import parse_file
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -26,6 +28,33 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _fmt(value: float) -> str:
+    return f"{value:.4f}"
+
+
+def _print_analyze_report(file_path: Path, metrics: DocumentMetrics) -> None:
+    print(f"NarrativePulse report for: {file_path}")
+    print(f"- lexical_diversity: {_fmt(metrics.lexical_diversity)}")
+    print(f"- sentence_rhythm: {_fmt(metrics.sentence_rhythm)}")
+    print(f"- dialogue_ratio: {_fmt(metrics.dialogue_ratio)}")
+    print(f"- avg_sentence_length: {_fmt(metrics.avg_sentence_length)}")
+    print(
+        "- style_signature: ["
+        + ", ".join(_fmt(item) for item in metrics.style_signature)
+        + "]"
+    )
+
+    print("repetition_hotspots:")
+    if not metrics.top_bigrams and not metrics.top_trigrams:
+        print("- none")
+        return
+
+    for hotspot in metrics.top_bigrams:
+        print(f"- [{hotspot.n}-gram] \"{hotspot.phrase}\" x{hotspot.count}")
+    for hotspot in metrics.top_trigrams:
+        print(f"- [{hotspot.n}-gram] \"{hotspot.phrase}\" x{hotspot.count}")
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -36,10 +65,8 @@ def main() -> int:
         except ValueError as exc:
             parser.error(str(exc))
 
-        print(f"Parsed file: {parsed.path}")
-        print(f"Paragraphs: {parsed.paragraph_count}")
-        print(f"Sentences: {parsed.sentence_count}")
-        print(f"Tokens: {parsed.token_count}")
+        metrics = analyze_document(parsed, top=args.top)
+        _print_analyze_report(parsed.path, metrics)
         return 0
 
     if args.command == "compare":
@@ -49,9 +76,15 @@ def main() -> int:
         except ValueError as exc:
             parser.error(str(exc))
 
-        print("Parsed both files successfully.")
-        print(f"A tokens: {parsed_a.token_count}")
-        print(f"B tokens: {parsed_b.token_count}")
+        metrics_a = analyze_document(parsed_a, top=args.top)
+        metrics_b = analyze_document(parsed_b, top=args.top)
+
+        print("NarrativePulse compare snapshot")
+        print("Similarity score will be added in the next step.")
+        print()
+        _print_analyze_report(parsed_a.path, metrics_a)
+        print()
+        _print_analyze_report(parsed_b.path, metrics_b)
         return 0
 
     parser.error("Unknown command.")
