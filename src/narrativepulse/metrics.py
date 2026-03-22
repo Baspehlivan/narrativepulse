@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from collections import Counter
 from dataclasses import dataclass
 from statistics import pstdev
@@ -25,6 +26,13 @@ class DocumentMetrics:
     style_signature: tuple[float, float, float, float]
     top_bigrams: list[Hotspot]
     top_trigrams: list[Hotspot]
+
+
+@dataclass(frozen=True)
+class ComparisonMetrics:
+    metrics_a: DocumentMetrics
+    metrics_b: DocumentMetrics
+    style_similarity: float
 
 
 def _safe_div(numerator: float, denominator: float) -> float:
@@ -105,4 +113,39 @@ def analyze_document(document: ParsedDocument, *, top: int = 10) -> DocumentMetr
         style_signature=signature,
         top_bigrams=_top_ngrams(document.tokens, n=2, top=top),
         top_trigrams=_top_ngrams(document.tokens, n=3, top=top),
+    )
+
+
+def cosine_similarity(
+    vector_a: tuple[float, ...],
+    vector_b: tuple[float, ...],
+) -> float:
+    if len(vector_a) != len(vector_b):
+        raise ValueError("Vectors must have equal length for cosine similarity.")
+
+    dot_product = sum(a * b for a, b in zip(vector_a, vector_b))
+    norm_a = sqrt(sum(a * a for a in vector_a))
+    norm_b = sqrt(sum(b * b for b in vector_b))
+
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot_product / (norm_a * norm_b)
+
+
+def compare_documents(
+    document_a: ParsedDocument,
+    document_b: ParsedDocument,
+    *,
+    top: int = 10,
+) -> ComparisonMetrics:
+    metrics_a = analyze_document(document_a, top=top)
+    metrics_b = analyze_document(document_b, top=top)
+    similarity = cosine_similarity(
+        metrics_a.style_signature,
+        metrics_b.style_signature,
+    )
+    return ComparisonMetrics(
+        metrics_a=metrics_a,
+        metrics_b=metrics_b,
+        style_similarity=similarity,
     )

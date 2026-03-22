@@ -5,7 +5,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from narrativepulse.metrics import DocumentMetrics, analyze_document
+from narrativepulse.metrics import (
+    ComparisonMetrics,
+    DocumentMetrics,
+    analyze_document,
+    compare_documents,
+)
 from narrativepulse.parser import parse_file
 
 
@@ -32,6 +37,16 @@ def _fmt(value: float) -> str:
     return f"{value:.4f}"
 
 
+def _similarity_label(score: float) -> str:
+    if score >= 0.90:
+        return "very high"
+    if score >= 0.75:
+        return "high"
+    if score >= 0.55:
+        return "medium"
+    return "low"
+
+
 def _print_analyze_report(file_path: Path, metrics: DocumentMetrics) -> None:
     print(f"NarrativePulse report for: {file_path}")
     print(f"- lexical_diversity: {_fmt(metrics.lexical_diversity)}")
@@ -55,6 +70,16 @@ def _print_analyze_report(file_path: Path, metrics: DocumentMetrics) -> None:
         print(f"- [{hotspot.n}-gram] \"{hotspot.phrase}\" x{hotspot.count}")
 
 
+def _print_compare_header(comparison: ComparisonMetrics) -> None:
+    score = comparison.style_similarity
+    print("NarrativePulse compare report")
+    print(
+        f"style_similarity: {_fmt(score)} "
+        f"({_similarity_label(score)})"
+    )
+    print()
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -76,12 +101,11 @@ def main() -> int:
         except ValueError as exc:
             parser.error(str(exc))
 
-        metrics_a = analyze_document(parsed_a, top=args.top)
-        metrics_b = analyze_document(parsed_b, top=args.top)
+        comparison = compare_documents(parsed_a, parsed_b, top=args.top)
+        metrics_a = comparison.metrics_a
+        metrics_b = comparison.metrics_b
 
-        print("NarrativePulse compare snapshot")
-        print("Similarity score will be added in the next step.")
-        print()
+        _print_compare_header(comparison)
         _print_analyze_report(parsed_a.path, metrics_a)
         print()
         _print_analyze_report(parsed_b.path, metrics_b)
