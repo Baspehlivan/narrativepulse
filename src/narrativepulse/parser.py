@@ -58,7 +58,11 @@ def split_paragraphs(text: str) -> list[str]:
 
 def split_sentences(text: str) -> list[str]:
     compact = text.replace("\n", " ")
-    return [part.strip() for part in SENTENCE_PATTERN.findall(compact) if part.strip()]
+    return [
+        part.strip()
+        for part in SENTENCE_PATTERN.findall(compact)
+        if part.strip() and tokenize_words(part)
+    ]
 
 
 def tokenize_words(text: str) -> list[str]:
